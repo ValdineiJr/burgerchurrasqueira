@@ -106,6 +106,28 @@
         const columnFinalizado = document.querySelector('#column-finalizado .cards-container');
         const columnCancelado = document.querySelector('#column-cancelado .cards-container');
 
+        // --- LÓGICA DA NOTIFICAÇÃO VISUAL ---
+        const originalTitle = document.title;
+        let titleInterval = null;
+
+        function startTitleFlash(message) {
+            if (titleInterval) return;
+            let isOriginalTitle = true;
+            titleInterval = setInterval(() => {
+                document.title = isOriginalTitle ? message : originalTitle;
+                isOriginalTitle = !isOriginalTitle;
+            }, 1000);
+        }
+
+        function stopTitleFlash() {
+            clearInterval(titleInterval);
+            titleInterval = null;
+            document.title = originalTitle;
+        }
+
+        window.addEventListener('focus', stopTitleFlash);
+        // --- FIM DA LÓGICA DE NOTIFICAÇÃO VISUAL ---
+
         loginForm.addEventListener('submit', (e) => { e.preventDefault(); signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => { loginError.textContent = 'E-mail ou senha incorretos.'; }); });
         logoutBtn.addEventListener('click', () => { signOut(auth); });
 
@@ -136,8 +158,11 @@
                     else if (orderData.status === "Saiu para Entrega" || orderData.status === "Concluído") { columnFinalizado.prepend(newCard); }
                     else { columnNovo.prepend(newCard); }
                     
-                    if (change.type === "added" && document.hasFocus()) {
+                    if (change.type === "added") {
                        notificationSound.play().catch(e => console.log("Usuário precisa interagir com a página para tocar som."));
+                       if (!document.hasFocus()) {
+                           startTitleFlash("🔴 NOVO PEDIDO!");
+                       }
                     }
                 });
             });
@@ -155,10 +180,8 @@
             const whatsappContactUrl = `https://wa.me/55${data.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá, ${data.customerName}! Sobre seu pedido #${id.substring(0,5)}...`)}`;
             const subtotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             
-            // CORREÇÃO APLICADA AQUI:
-            // Usamos '?? 0' para garantir que se a taxa ou total não existirem (em pedidos antigos), o valor seja 0.
             const deliveryFee = data.deliveryFee ?? 0;
-            const total = data.total ?? subtotal; // Se o total não existir, mostra o subtotal
+            const total = data.total ?? subtotal;
 
             let actionButtons = '';
             if (data.status !== 'Cancelado' && data.status !== 'Concluído') {
@@ -198,7 +221,7 @@
             if (!target || !target.dataset.id) return;
             const orderId = target.dataset.id;
 
-            if (target.classList.contains('btn-print')) { /* ... código de impressão ... */ return; }
+            if (target.classList.contains('btn-print')) { /* código de impressão */ return; }
             
             if (target.tagName === 'BUTTON') {
                 const customerName = target.dataset.name;
