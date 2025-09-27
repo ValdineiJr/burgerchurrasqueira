@@ -13,6 +13,18 @@
         body { font-family: 'Roboto', sans-serif; margin: 0; background-color: var(--dark-bg); color: var(--light-text); }
         .header { background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1579685311953-b0e6c6e7f8b9?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaGPOby1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') center/cover; color: var(--light-text); padding: 50px 20px; text-align: center; border-bottom: 5px solid var(--primary-color); }
         .header h1 { font-family: 'Oswald', sans-serif; font-size: 3em; margin: 0; text-transform: uppercase; }
+        
+        /* AVISO DE LOJA FECHADA */
+        #store-status-banner {
+            display: none;
+            background-color: var(--secondary-color);
+            color: var(--light-text);
+            text-align: center;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
         .container { max-width: 800px; margin: 30px auto; padding: 0 20px; }
         .special-event-notice, .call-to-action, .menu-section, .chapeiro-section { margin-bottom: 30px; }
         .special-event-notice { background-color: var(--secondary-color); color: var(--light-text); text-align: center; padding: 25px 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); border: 2px solid var(--primary-color); }
@@ -56,10 +68,19 @@
         .footer a { color: #BDBDBD; text-decoration: none; }
         #music-control { position: fixed; bottom: 25px; left: 25px; background-color: var(--card-bg); color: var(--primary-color); border: 2px solid var(--primary-color); border-radius: 50%; width: 50px; height: 50px; font-size: 1.8em; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0.7; transition: opacity 0.2s; }
         #music-control:hover { opacity: 1; }
+        /* ESTILOS PARA QUANDO A LOJA ESTÁ FECHADA */
+        .store-closed .item-actions button {
+            background-color: #616161 !important;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
     <header class="header"><h1>🔥 BURGER NA CHURRASQUEIRA 🔥</h1><p>O sabor autêntico da brasa!</p></header>
+    
+    <div id="store-status-banner"></div>
+
     <div class="container">
         <div class="special-event-notice"><h2>🎉 Dia Especial de Burger Artesanal na Brasa! 🎉</h2><p>Resolvi matar a saudade e vou preparar um dia especial de burger artesanal na brasa!</p><p>👉 Será <strong>apenas por encomenda antecipada</strong>, com vagas limitadas.</p><p>👉 Para garantir o pedido, será necessário o <strong>pagamento de 40% antecipado</strong>.</p></div>
         <div class="call-to-action"><h2>Faça já seu pedido!</h2><p>Escolha seus lanches abaixo e clique no carrinho para finalizar.</p></div>
@@ -265,7 +286,51 @@
 
         renderMenu();
         updateTotal();
+
+        // --- LÓGICA DE CONTROLE DE HORÁRIO ---
+        const horariosFuncionamento = {
+            // 0: Domingo, 1: Segunda, 2: Terça, etc.
+            0: { inicio: 18, fim: 23 }, // Domingo
+            1: null,                    // Segunda (fechado)
+            2: { inicio: 18, fim: 23 }, // Terça
+            3: { inicio: 18, fim: 23 }, // Quarta
+            4: { inicio: 18, fim: 23 }, // Quinta
+            5: { inicio: 18, fim: 0 },  // Sexta (até 23:59)
+            6: { inicio: 18, fim: 0 }   // Sábado (até 23:59)
+        };
+
+        function verificarSeLojaEstaAberta() {
+            const agora = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Sao_Paulo"}));
+            const diaDaSemana = agora.getDay();
+            const horaAtual = agora.getHours();
+            const horarioDeHoje = horariosFuncionamento[diaDaSemana];
+            if (!horarioDeHoje) {
+                return { aberto: false, mensagem: "Hoje estamos fechados!" };
+            }
+            // Lógica para horários que viram a noite
+            if (horarioDeHoje.fim === 0) {
+                return horaAtual >= horarioDeHoje.inicio ? { aberto: true } : { aberto: false, mensagem: `Estamos fechados! Abrimos às ${horarioDeHoje.inicio}:00.` };
+            }
+            // Lógica para horários no mesmo dia
+            if (horaAtual >= horarioDeHoje.inicio && horaAtual < horarioDeHoje.fim) {
+                return { aberto: true };
+            }
+            return { aberto: false, mensagem: `Estamos fechados! Nosso horário hoje é das ${horarioDeHoje.inicio}:00 às ${horarioDeHoje.fim}:00.` };
+        }
+
+        function controlarStatusLoja() {
+            const status = verificarSeLojaEstaAberta();
+            if (!status.aberto) {
+                const banner = document.getElementById('store-status-banner');
+                banner.textContent = status.mensagem;
+                banner.style.display = 'block';
+                document.body.classList.add('store-closed');
+                document.querySelectorAll('.item-actions button').forEach(button => {
+                    button.disabled = true;
+                });
+            }
+        }
+        document.addEventListener('DOMContentLoaded', controlarStatusLoja);
     </script>
 </body>
-
 </html>
