@@ -51,7 +51,19 @@
         .summary-card p { font-size: 2.2em; margin: 10px 0 0 0; font-weight: bold; color: var(--light-text); }
         #total-sales { color: var(--green); }
         #cancelled-orders { color: var(--secondary-color); }
-        .chart-container { position: relative; min-height: 400px; width: 100%; }
+        
+        /* --- ESTA É A CORREÇÃO CRÍTICA PARA O CARREGAMENTO INFINITO --- */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 400px; /* Usar 'height' ao invés de 'min-height' pode ser mais estável */
+        }
+        .dual-chart-container .chart-container {
+            min-height: 350px;
+            height: auto; /* Permite que os gráficos menores se ajustem */
+        }
+
+
         .dual-chart-container { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         .bestsellers-container { grid-column: 1 / -1; }
         #no-data-message { text-align: center; font-size: 1.2em; color: var(--grey); padding: 40px; display: none; grid-column: 1 / -1; }
@@ -96,21 +108,23 @@
                     <div class="summary-card"><h3>Pedidos Cancelados</h3><p id="cancelled-orders">0</p></div>
                     <div class="summary-card"><h3>Ticket Médio</h3><p id="average-ticket">R$ 0,00</p></div>
                     
-                    <div class="summary-card chart-container bestsellers-container">
+                    <div class="summary-card bestsellers-container">
                         <h3>🏆 Itens Mais Vendidos</h3>
-                        <canvas id="bestsellers-chart"></canvas>
+                        <div class="chart-container">
+                           <canvas id="bestsellers-chart"></canvas>
+                        </div>
                     </div>
                     
                     <div class="dual-chart-container">
                         <div class="summary-card">
                             <h3>🚚 Entregas vs Retiradas</h3>
-                            <div class="chart-container" style="min-height: 350px;">
+                            <div class="chart-container">
                                 <canvas id="delivery-chart"></canvas>
                             </div>
                         </div>
                         <div class="summary-card">
                             <h3>💳 Formas de Pagamento</h3>
-                            <div class="chart-container" style="min-height: 350px;">
+                            <div class="chart-container">
                                 <canvas id="payment-chart"></canvas>
                             </div>
                         </div>

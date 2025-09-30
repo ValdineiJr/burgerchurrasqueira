@@ -9,7 +9,7 @@
         :root {
             --primary-color: #FFC107; --secondary-color: #D32F2F; --dark-bg: #212121;
             --light-text: #FFFFFF; --card-bg: #424242; --green: #4CAF50; --blue: #2196F3;
-            --grey: #9E9E9E; --print-bg: #FFFFFF; --print-text: #000000;
+            --grey: #9E9E9E;
         }
         body { font-family: 'Roboto', sans-serif; margin: 0; background-color: var(--dark-bg); color: var(--light-text); }
         #login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; width: 100%; max-width: 400px; padding: 20px; text-align: center; margin: 0 auto; }
@@ -38,35 +38,37 @@
         .order-card[data-status="Em Preparo"] { border-color: var(--primary-color); }
         .order-card[data-status="Saiu para Entrega"] { border-color: var(--blue); }
         .order-card[data-status="Concluído"] { border-color: var(--green); }
-        .order-card[data-status="Cancelado"] { border-color: var(--grey); opacity: 0.6; text-decoration: line-through; }
+        .order-card[data-status="Cancelado"] { border-color: var(--grey); opacity: 0.7; }
         .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .order-header h3, .customer-info p, .notes-info p { margin: 5px 0; }
         .customer-info strong, .notes-info strong { color: var(--primary-color); }
         .notes-info { background-color: rgba(0,0,0,0.2); border-radius: 5px; padding: 10px; margin-top: 10px; word-break: break-word; }
+        .cancellation-reason { border: 2px solid var(--secondary-color); }
         .order-items { list-style: none; padding: 10px 0; margin: 10px 0; border-top: 1px solid #616161; border-bottom: 1px solid #616161; }
+        .order-items li { padding-bottom: 5px; margin-bottom: 5px; }
+        .order-item-note { font-size: 0.9em; color: var(--primary-color); padding-left: 20px; font-style: italic; }
         .order-summary { border-top: 1px solid #616161; margin-top: 10px; padding-top: 10px; }
         .order-summary p { display: flex; justify-content: space-between; margin: 5px 0; }
         .order-summary p.total-final { font-size: 1.4em; font-weight: bold; }
-        .order-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: auto; padding-top: 15px; }
+        .order-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: auto; padding-top: 15px; }
         .order-actions button, .order-actions a { text-decoration: none; text-align: center; border: none; color: white; padding: 10px; font-size: 0.8em; font-weight: bold; border-radius: 5px; cursor: pointer; }
         .btn-whatsapp { background-color: #25D366; }
         .btn-preparo { background-color: var(--primary-color); color: var(--dark-text); }
         .btn-entrega { background-color: var(--blue); }
         .btn-concluir { background-color: var(--green); }
-        .btn-print { background-color: #616161; grid-column: span 3; }
-        .btn-cancelar { background-color: var(--secondary-color); grid-column: span 3; }
+        .btn-print { background-color: #616161; }
+        .btn-cancelar { background-color: var(--secondary-color); }
         .customer-info p.delivery-method { font-weight: bold; color: var(--primary-color); }
         .footer { text-align: center; padding: 15px; font-size: 0.9em; color: #757575; flex-shrink: 0; }
         .footer a { color: #BDBDBD; text-decoration: none; }
         @media (max-width: 900px) { .kanban-board { flex-direction: column; } .kanban-column { min-width: unset; } }
-        @media print { /* CSS de impressão */ }
     </style>
 </head>
 <body>
     <div id="login-container"><div class="login-box"><h1>🔥 Painel do Chapeiro 🔥</h1><form id="login-form"><input type="email" id="email" placeholder="Seu e-mail" required><input type="password" id="password" placeholder="Sua senha" required><button type="submit">Entrar</button></form><p id="login-error"></p></div></div>
     <div id="main-panel">
         <header class="header">
-            <h1>Painel de Pedidos</h1>
+            <h1>Painel de Pedidos </h1>
             <div class="header-actions">
                 <a href="relatorio.html" target="_blank">Relatórios 📊</a>
                 <a href="index.html" target="_blank">Cardápio 📋</a>
@@ -108,6 +110,7 @@
 
         const originalTitle = document.title;
         let titleInterval = null;
+        let allOrdersData = {};
 
         function startTitleFlash(message) {
             if (titleInterval) return;
@@ -126,7 +129,8 @@
 
         window.addEventListener('focus', stopTitleFlash);
 
-        loginForm.addEventListener('submit', (e) => { e.preventDefault(); signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => { loginError.textContent = 'E-mail ou senha incorretos.'; }); });
+        loginForm.addEventListener('submit', (e) => { e.preventDefault(); const loginButton = e.target.querySelector('button'); loginButton.textContent = "Entrando..."; loginError.textContent = ""; signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value).catch(err => { loginError.textContent = 'E-mail ou senha incorretos.'; loginButton.textContent = "Entrar"; }); });
+        
         logoutBtn.addEventListener('click', () => { signOut(auth); });
 
         onAuthStateChanged(auth, (user) => {
@@ -146,6 +150,7 @@
                 snapshot.docChanges().forEach((change) => {
                     const orderData = change.doc.data();
                     const orderId = change.doc.id;
+                    allOrdersData[orderId] = orderData;
                     const existingCard = document.getElementById(orderId);
                     if (existingCard) existingCard.remove();
                     const newCard = createOrderCard(orderId, orderData);
@@ -168,33 +173,25 @@
             card.className = 'order-card';
             card.id = id;
             card.dataset.status = data.status;
-
-            const itemsHtml = data.items.map(item => `<li>${item.quantity}x ${item.name}</li>`).join('');
+            const itemsHtml = (data.items || []).map(item => { const noteHtml = item.notes ? `<div class="order-item-note">OBS: ${item.notes}</div>` : ''; return `<li>${item.quantity}x ${item.name}${noteHtml}</li>`; }).join('');
             const orderTime = data.timestamp ? new Date(data.timestamp.seconds * 1000).toLocaleTimeString('pt-BR') : 'agora';
-            const notesHtml = data.customerNotes && data.customerNotes !== "Nenhuma" ? `<div class="notes-info"><p><strong>Observações:</strong> ${data.customerNotes}</p></div>` : '';
+            const notesHtml = data.customerNotes && data.customerNotes !== "Nenhuma" ? `<div class="notes-info"><p><strong>Observações Gerais:</strong> ${data.customerNotes}</p></div>` : '';
+            const cancellationReasonHtml = data.status === 'Cancelado' && data.cancellationReason ? `<div class="notes-info cancellation-reason"><p><strong>Motivo do Cancelamento:</strong> ${data.cancellationReason}</p></div>` : '';
             const whatsappContactUrl = `https://wa.me/55${data.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá, ${data.customerName}! Sobre seu pedido #${id.substring(0,5)}...`)}`;
-            const subtotal = data.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const subtotal = (data.items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
             const deliveryFee = data.deliveryFee ?? 0;
             const total = data.total ?? subtotal;
-
             let operationalButtons = '';
-            // Botões de operação só aparecem se o pedido estiver ativo
             if (data.status === 'Novo' || data.status === 'Em Preparo' || data.status === 'Saiu para Entrega') {
                 operationalButtons = `
-                    <a href="${whatsappContactUrl}" target="_blank" class="btn-whatsapp">Contato Cliente</a>
                     <button class="btn-preparo" data-id="${id}" data-name="${data.customerName}" data-phone="${data.customerPhone}">Em Preparo</button>
                     <button class="btn-entrega" data-id="${id}" data-name="${data.customerName}" data-phone="${data.customerPhone}">Saiu p/ Entrega</button>
                     <button class="btn-concluir" data-id="${id}" data-name="${data.customerName}" data-phone="${data.customerPhone}">Concluído</button>
+                    <a href="${whatsappContactUrl}" target="_blank" class="btn-whatsapp" data-id="${id}">Contato Cliente</a>
                     <button class="btn-cancelar" data-id="${id}">Cancelar Pedido</button>
                 `;
             }
-
-            // Botão de imprimir aparece em todos, exceto nos cancelados.
-            let printButton = '';
-            if (data.status !== 'Cancelado') {
-                printButton = `<button class="btn-print" data-id="${id}">🖨️ Imprimir</button>`;
-            }
-
+            let printButton = `<button class="btn-print" data-id="${id}">🖨️ Imprimir</button>`;
             card.innerHTML = `
                 <div class="order-header"><h3>Pedido #${id.substring(0, 5).toUpperCase()}</h3><span>${orderTime}</span></div>
                 <div class="customer-info">
@@ -203,6 +200,7 @@
                     ${data.deliveryMethod === 'Entrega' ? `<p><strong>Endereço:</strong> ${data.customerAddress}</p>` : ''}
                     <p><strong>Pagamento:</strong> ${data.paymentMethod}</p>
                 </div>
+                ${cancellationReasonHtml}
                 <div class="order-details"><ul class="order-items">${itemsHtml}</ul></div>
                 ${notesHtml}
                 <div class="order-summary">
@@ -210,11 +208,60 @@
                     <p><span>Taxa de Entrega</span><span>R$ ${deliveryFee.toFixed(2)}</span></p>
                     <p class="total-final"><span>Total</span><span>R$ ${total.toFixed(2)}</span></p>
                 </div>
-                <div class="order-actions">
-                    ${operationalButtons}
-                    ${printButton}
-                </div>`;
+                <div class="order-actions">${operationalButtons}${printButton}</div>`;
             return card;
+        }
+
+        function printOrder(orderId) {
+            const data = allOrdersData[orderId];
+            if (!data) {
+                alert("Erro: Dados do pedido não encontrados para impressão.");
+                return;
+            }
+            const itemsHtml = (data.items || []).map(item => {
+                const note = item.notes ? `<div class="note" style="font-size: 0.9em; font-style: italic;">&nbsp;&nbsp;OBS: ${item.notes}</div>` : '';
+                return `<tr><td style="vertical-align: top; padding-right: 5px;">${item.quantity}x</td><td>${item.name}${note}</td></tr>`;
+            }).join('');
+            const notesHtml = data.customerNotes && data.customerNotes !== "Nenhuma" ? `<hr><p><b>Obs. Gerais:</b> ${data.customerNotes}</p>` : '';
+            const deliveryHtml = data.deliveryMethod === 'Entrega' ? `<p><b>Endereço:</b> ${data.customerAddress}</p>` : '';
+            
+            const printHtml = `
+                <html><head><title>Pedido #${orderId.substring(0, 5).toUpperCase()}</title>
+                    <style>
+                        body { font-family: 'Courier New', monospace; width: 80mm; margin: 0; padding: 3mm; color: black; box-sizing: border-box; }
+                        h2, h3, p { margin: 6px 0; }
+                        h2 { text-align: center; margin-bottom: 10px; }
+                        hr { border: none; border-top: 1px dashed black; margin: 8px 0; }
+                        table { width: 100%; border-collapse: collapse; margin: 10px 0;}
+                        b { font-weight: bold; }
+                    </style>
+                </head><body>
+                    <h2>Burger na Churrasqueira</h2>
+                    <h3>Pedido: #${orderId.substring(0, 5).toUpperCase()}</h3>
+                    <p><b>Cliente:</b> ${data.customerName}</p>
+                    <p><b>Recebimento:</b> ${data.deliveryMethod}</p>
+                    ${deliveryHtml}
+                    <p><b>Pagamento:</b> ${data.paymentMethod}</p>
+                    <hr>
+                    <table>${itemsHtml}</table>
+                    ${notesHtml}
+                    <hr>
+                    <p style="font-size: 1.1em;"><b>TOTAL: R$ ${(data.total ?? 0).toFixed(2)}</b></p>
+                </body></html>
+            `;
+
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.write(printHtml);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => {
+                    printWindow.print();
+                    printWindow.close();
+                }, 250);
+            } else {
+                alert("Seu navegador bloqueou a janela de impressão. Por favor, permita pop-ups para este site.");
+            }
         }
 
         mainPanel.addEventListener('click', async (e) => {
@@ -222,25 +269,30 @@
             if (!target || !target.dataset.id) return;
             const orderId = target.dataset.id;
 
-            if (target.classList.contains('btn-print')) { /* código de impressão */ return; }
+            if (target.classList.contains('btn-print')) {
+                printOrder(orderId);
+                return;
+            }
             
             if (target.tagName === 'BUTTON') {
                 const customerName = target.dataset.name;
                 const customerPhone = target.dataset.phone;
                 let newStatus = '';
                 let whatsappMsg = '';
-
+                let cancellationReason = null;
                 if (target.classList.contains('btn-preparo')) { newStatus = "Em Preparo"; whatsappMsg = `Olá, ${customerName}! Seu pedido #${orderId.substring(0,5)} já está em preparação! 🔥`; }
                 if (target.classList.contains('btn-entrega')) { newStatus = "Saiu para Entrega"; whatsappMsg = `Oba, ${customerName}! Seu pedido #${orderId.substring(0,5)} saiu para entrega! 🚀`; }
                 if (target.classList.contains('btn-concluir')) { newStatus = "Concluído"; whatsappMsg = `Olá, ${customerName}! Seu pedido #${orderId.substring(0,5)} foi finalizado. Muito obrigado pela preferência! ❤️`; }
                 if (target.classList.contains('btn-cancelar')) { 
-                    if (confirm('Tem certeza que deseja CANCELAR este pedido?')) {
-                        newStatus = "Cancelado"; 
-                    }
+                    const reason = prompt("Por favor, informe o motivo do cancelamento (obrigatório):");
+                    if (reason && reason.trim() !== '') { newStatus = "Cancelado"; cancellationReason = reason.trim(); } 
+                    else if (reason !== null) { alert('O motivo do cancelamento é obrigatório.'); }
                 }
 
                 if (newStatus) {
-                    await updateDoc(doc(db, "pedidos", orderId), { status: newStatus });
+                    const updateData = { status: newStatus };
+                    if (cancellationReason) { updateData.cancellationReason = cancellationReason; }
+                    await updateDoc(doc(db, "pedidos", orderId), updateData);
                     if (whatsappMsg && customerPhone) {
                         const whatsappUrl = `https://wa.me/55${customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMsg)}`;
                         window.open(whatsappUrl, '_blank');
